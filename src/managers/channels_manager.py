@@ -1,6 +1,6 @@
 from loaders.channels import BaseChannelsLoader
 from telethon.tl import functions
-from telethon.tl.types import Updates, ChatInviteAlready
+from telethon.tl.types import Updates, ChatInviteAlready, ChatInvite
 import logging
 import random
 from pprint import pprint
@@ -20,23 +20,41 @@ class ChannelsManager:
         channels_list = list()
 
         for channel_info in channels_loader.get_all():
-            # updates = await self.client(functions.messages.ImportChatInviteRequest(channel_id))
-            # pprint(updates.chats.stringify())
-            # channel = await self.client(CheckChatInviteRequest(channel_id))
-            # pprint(channel.to_dict())
+            if channel_info.private:
+                channel = await self.get_private_channel(channel_info)
+            else:
+                channel = await self.get_public_channel(channel_info)
 
-            channel = await self._get_full_chat_obj(channel_info["id"])
             if channel:
-                channels_list.append(channel.chats[0])
+                channels_list.append(channel)
         logger.info(f"Channels: {len(channels_list)}")
+
         return channels_list
+
+    async def get_private_channel(self, channel_info):
+        channel = None
+
+        channel_invite = await self.client(CheckChatInviteRequest(channel_info.id))
+        if channel_invite:
+            if isinstance(channel_invite, ChatInvite):
+                channel_updates = await self.client(functions.messages.ImportChatInviteRequest(channel_info.id))
+                channel = channel_updates.chats[0]
+            elif isinstance(channel_invite, ChatInviteAlready):
+                channel = channel_invite.chat
+            if channel:
+                channel = await self._get_chat_obj(channel.id)
+        return channel
+
+    async def get_public_channel(self, channel_info):
+        channel = await self._get_chat_obj(channel_info.id)
+        return channel
 
     async def start_commenting(self, comments: list):
         for channel in await self.channels_list:
             logger.info(f"Try left comment to channel({channel.id})")
             comment = random.choices(comments)[0]
 
-            messages = await self.get_last_messages(channel=channel, limit=10)
+            messages = await self.get_last_messages(channel=channel, limit=1)
             if not messages:
                 logger.warning(f"Empty messages list in channel({channel.id})")
                 continue
@@ -106,7 +124,7 @@ class ChannelsManager:
     async def commenting_message(self, channel, comment, message_id):
         try:
             result = await self.client(functions.messages.SendMessageRequest(peer=channel,
-                                                                             message=comment,
+                                                                             message=comment.message,
                                                                              reply_to_msg_id=message_id))
             return result
         except Exception as e:
