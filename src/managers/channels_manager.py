@@ -1,6 +1,7 @@
 from loaders.channels import BaseChannelsLoader
-from telethon.tl import functions
-from telethon.tl.types import Updates, ChatInviteAlready, ChatInvite
+from loaders.comments import CommentLoaderModel, FileTypes
+from telethon.tl import functions, types
+from telethon.tl.types import Updates, ChatInviteAlready, ChatInvite, InputFile, DocumentAttributeVideo, DocumentAttributeFilename
 import logging
 import random
 from pprint import pprint
@@ -59,8 +60,6 @@ class ChannelsManager:
                 logger.warning(f"Empty messages list in channel({channel.id})")
                 continue
 
-            # TODO можливо коментарь не може бути залишеним під цим повідомленням,
-            # тому потрібно буде спробувати відправляти коментар на повідомлення по черзі поки не вдастся
             discussion_msg = await self.get_random_discussion_message(channel=channel, messages=messages)
             if not discussion_msg:
                 logger.error(f"Could not get any discussion message from messages in channel({channel.id})")
@@ -73,10 +72,11 @@ class ChannelsManager:
                 logger.warning(
                     f"Could not leave a comment message({discussion_msg.messages[0].id}) in channel({channel.id})")
                 continue
+            logger.info(f"Successfully added comment to channel({channel.id})!")
 
     async def get_last_messages(self, channel, limit=10) -> list:
-        offset_msg = 0  # номер записи, с которой начинается считывание
-        all_messages = []  # список всех сообщений
+        offset_msg = 0
+        all_messages = []
         limit_per_request = self.MESSAGES_LIMIT if limit > self.MESSAGES_LIMIT else limit
 
         while True:
@@ -118,14 +118,50 @@ class ChannelsManager:
                                                                    msg_id=message['id']))
                 return discussion_msg
             except Exception as e:
-                logger.error(e)
+                logger.warning(e)
         return
 
     async def commenting_message(self, channel, comment, message_id):
         try:
-            result = await self.client(functions.messages.SendMessageRequest(peer=channel,
-                                                                             message=comment.message,
-                                                                             reply_to_msg_id=message_id))
+            if comment.file_path:
+                media = None
+                if comment.file_type == FileTypes.IMAGE:
+                    media = types.InputMediaUploadedPhoto(
+                                file=await self.client.upload_file(comment.file_path),
+                                ttl_seconds=42
+                            )
+                elif comment.file_type == FileTypes.TEXT_DOCUMENT:
+                    media = types.InputMediaUploadedDocument(
+                                file=await self.client.upload_file(comment.file_path),
+                                ttl_seconds=42,
+                                mime_type=f'text/{comment.file_path.split(".")[-1]}',
+                                attributes=[DocumentAttributeFilename(comment.file_path.split("\\")[-1])]
+                            )
+                elif comment.file_type == FileTypes.APPLICATION_DOCUMENT:
+                    media = types.InputMediaUploadedDocument(
+                                file=await self.client.upload_file(comment.file_path),
+                                ttl_seconds=42,
+                                mime_type=f'application/{comment.file_path.split(".")[-1]}',
+                                attributes=[DocumentAttributeFilename(comment.file_path.split("\\")[-1])]
+                            )
+                elif comment.file_type == FileTypes.VIDEO:
+                    media = types.InputMediaUploadedDocument(
+                                file=await self.client.upload_file(comment.file_path),
+                                ttl_seconds=42,
+                                mime_type=f'video/{comment.file_path.split(".")[-1]}',
+                                attributes=[DocumentAttributeFilename(comment.file_path.split("\\")[-1])]
+                            )
+
+                if media:
+                    result = await self.client(functions.messages.SendMediaRequest(
+                        peer=channel,
+                        media=media,
+                        message=comment.message,
+                        reply_to_msg_id=message_id))
+            else:
+                result = await self.client(functions.messages.SendMessageRequest(peer=channel,
+                                                                                 message=comment.message,
+                                                                                 reply_to_msg_id=message_id))
             return result
         except Exception as e:
             logger.error(e)
