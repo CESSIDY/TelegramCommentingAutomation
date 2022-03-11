@@ -125,6 +125,9 @@ class ChannelsManager:
         try:
             if comment.file_path:
                 media = None
+                file_name = comment.file_path.split("\\")[-1]
+                file_extension = comment.file_path.split(".")[-1]
+
                 if comment.file_type == FileTypes.IMAGE:
                     media = types.InputMediaUploadedPhoto(
                                 file=await self.client.upload_file(comment.file_path),
@@ -134,22 +137,22 @@ class ChannelsManager:
                     media = types.InputMediaUploadedDocument(
                                 file=await self.client.upload_file(comment.file_path),
                                 ttl_seconds=42,
-                                mime_type=f'text/{comment.file_path.split(".")[-1]}',
-                                attributes=[DocumentAttributeFilename(comment.file_path.split("\\")[-1])]
+                                mime_type=f'text/{file_extension}',
+                                attributes=[DocumentAttributeFilename(file_name)]
                             )
                 elif comment.file_type == FileTypes.APPLICATION_DOCUMENT:
                     media = types.InputMediaUploadedDocument(
                                 file=await self.client.upload_file(comment.file_path),
                                 ttl_seconds=42,
-                                mime_type=f'application/{comment.file_path.split(".")[-1]}',
-                                attributes=[DocumentAttributeFilename(comment.file_path.split("\\")[-1])]
+                                mime_type=f'application/{file_extension}',
+                                attributes=[DocumentAttributeFilename(file_name)]
                             )
                 elif comment.file_type == FileTypes.VIDEO:
                     media = types.InputMediaUploadedDocument(
                                 file=await self.client.upload_file(comment.file_path),
                                 ttl_seconds=42,
-                                mime_type=f'video/{comment.file_path.split(".")[-1]}',
-                                attributes=[DocumentAttributeFilename(comment.file_path.split("\\")[-1])]
+                                mime_type=f'video/{file_extension}',
+                                attributes=[DocumentAttributeFilename(file_name)]
                             )
 
                 if media:
