@@ -123,6 +123,7 @@ class ChannelsManager:
 
     async def commenting_message(self, channel, comment, message_id):
         try:
+            result = None
             if comment.file_path:
                 media = None
                 file_name = comment.file_path.split("\\")[-1]
