@@ -17,8 +17,20 @@ class Commentator:
         api_id = int(self.config['Telegram']['api_id'])
         api_hash = self.config['Telegram']['api_hash']
         username = self.config['Telegram']['username']
+        is_proxy_enabled = int(self.config['Proxy']['proxy_enabled'])
 
-        client = TelegramClient(username, api_id, api_hash)
+        if is_proxy_enabled:
+            proxy = {
+                'proxy_type': self.config['Proxy']['proxy_type'],  # (mandatory) protocol to use (see above)
+                'addr': self.config['Proxy']['addr'],  # (mandatory) proxy IP address
+                'port': self.config['Proxy']['port'],  # (mandatory) proxy port number
+                'username': self.config['Proxy']['username'],  # (optional) username if the proxy requires auth
+                'password': self.config['Proxy']['password'],  # (optional) password if the proxy requires auth
+                'rdns': True  # (optional) whether to use remote or local resolve, default remote
+            }
+            client = TelegramClient(username, api_id, api_hash, proxy=proxy)
+        else:
+            client = TelegramClient(username, api_id, api_hash)
         client.start()
         return client
 
