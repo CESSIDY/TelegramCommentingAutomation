@@ -6,16 +6,19 @@ import logging
 import random
 from pprint import pprint
 from telethon.tl.functions.messages import CheckChatInviteRequest
+from telethon.tl.types import Channel
 
 logger = logging.getLogger(__name__)
 
 
 class ChannelsManager:
     MESSAGES_LIMIT = 100
+    DISCUSSION_MESSAGES_LIMIT = 1000
 
     def __init__(self, client, channels_loader_adaptor: BaseChannelsLoader):
         self.channels_list = self._get_channels_objects(channels_loader_adaptor)
         self.client = client
+        self.user_owner = self.client.get_me()
 
     async def _get_channels_objects(self, channels_loader: BaseChannelsLoader) -> list:
         channels_list = list()
@@ -52,27 +55,54 @@ class ChannelsManager:
 
     async def start_commenting(self, comments: list):
         for channel in await self.channels_list:
-            logger.info(f"Try left comment to channel({channel.id})")
+            logger.info(f"Try left comment to channel({channel.title}/{channel.id})")
             comment = random.choices(comments)[0]
 
-            messages = await self.get_last_messages(channel=channel, limit=1)
-            if not messages:
-                logger.warning(f"Empty messages list in channel({channel.id})")
-                continue
+            result = await self.commenting_last_uncommenting_message(channel, comment, limit=10)
 
-            discussion_msg = await self.get_random_discussion_message(channel=channel, messages=messages)
+    async def commenting_last_uncommenting_message(self, channel, comment, limit=1):
+        post_messages = await self.get_last_messages(channel=channel, limit=limit)
+
+        if not post_messages:
+            logger.warning(f"Empty posts list in channel({channel.title}/{channel.id})")
+            return False
+
+        for post_message in post_messages:
+            discussion_msg = await self.get_random_discussion_message(channel=channel, messages=[post_message])
+
             if not discussion_msg:
-                logger.error(f"Could not get any discussion message from messages in channel({channel.id})")
+                logger.error(f"Could not get discussion messages from message({post_message['id']})")
                 continue
 
             discussion_channel = await self._get_chat_obj(discussion_msg.chats[0].id)
-            commenting_result = await self.commenting_message(channel=discussion_channel, comment=comment,
-                                                              message_id=discussion_msg.messages[0].id)
-            if not commenting_result:
-                logger.warning(
-                    f"Could not leave a comment message({discussion_msg.messages[0].id}) in channel({channel.id})")
-                continue
-            logger.info(f"Successfully added comment to channel({channel.id})!")
+
+            if await self.is_not_commenting_post(discussion_channel, discussion_msg.messages[0].id):
+                commenting_result = await self.commenting_message(channel=discussion_channel, comment=comment,
+                                                                  message_id=discussion_msg.messages[0].id)
+                if not commenting_result:
+                    logger.warning(
+                        f"Could not leave a comment message({discussion_msg.messages[0].id}) in channel({channel.title}/{channel.id})")
+                    continue
+                logger.info(f"Successfully added comment to channel({channel.title}/{channel.id})!")
+                return True
+        logger.warning(f"Could not leave comment under any message in channel({channel.title}/{channel.id})!")
+        return False
+
+    async def is_not_commenting_post(self, discussion_channel, msg_id):
+        discussion_messages = await self.get_last_messages_for_discussion(discussion_channel, msg_id)
+
+        for message in discussion_messages:
+            if self.user_owner.id == message['from_id'].get('user_id', None):
+                return False
+        return True
+
+    async def get_last_messages_for_discussion(self, discussion_channel, msg_id):
+        all_messages = await self.get_last_messages(channel=discussion_channel, limit=self.DISCUSSION_MESSAGES_LIMIT)
+        discussion_messages = list()
+        for message in all_messages:
+            if message['reply_to'] and message.get('reply_to', {}).get('reply_to_msg_id', None) == msg_id:
+                discussion_messages.append(message)
+        return discussion_messages
 
     async def get_last_messages(self, channel, limit=10) -> list:
         offset_msg = 0

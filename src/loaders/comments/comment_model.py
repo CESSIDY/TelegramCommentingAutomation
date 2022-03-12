@@ -12,10 +12,10 @@ class FileTypes(Enum):
 @dataclass
 class CommentLoaderModel:
     message: str
-    file_path: str
-    file_type: FileTypes
+    file_path: [str, None]
+    file_type: [FileTypes, None]
 
-    def __init__(self, message: str, file_path: str, file_type: FileTypes):
+    def __init__(self, message: str, file_path: [str, None], file_type: [FileTypes, None]):
         self.message = message
         self.file_path = file_path
         self.file_type = file_type

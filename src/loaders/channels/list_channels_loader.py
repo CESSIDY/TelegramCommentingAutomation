@@ -2,7 +2,7 @@ from . import BaseChannelsLoader
 from .channel_model import ChannelLoaderModel
 
 
-class JsonChannelsLoader(BaseChannelsLoader):
+class ListChannelsLoader(BaseChannelsLoader):
 
     def __init__(self):
         self._channels_ids_list = [ChannelLoaderModel(id="bwt_commentator_test_1", private=False),

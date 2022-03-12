@@ -1,4 +1,4 @@
 from .base_comments_loader import BaseCommentsLoader
-from .json_comments_loader import JsonCommentsLoader
+from .list_comments_loader import ListCommentsLoader
 from .comment_model import CommentLoaderModel, FileTypes
 
