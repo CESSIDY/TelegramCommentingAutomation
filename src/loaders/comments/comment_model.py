@@ -1,5 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum
+from os.path import exists
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class FileTypes(Enum):
@@ -17,5 +21,12 @@ class CommentLoaderModel:
 
     def __init__(self, message: str, file_path: [str, None], file_type: [FileTypes, None]):
         self.message = message
-        self.file_path = file_path
+        self.file_path = self._check_if_file_exists(file_path)
         self.file_type = file_type
+
+    @staticmethod
+    def _check_if_file_exists(file_path):
+        if exists(file_path):
+            return file_path
+        logger.warning(f"File does not exist: {file_path}")
+        return None

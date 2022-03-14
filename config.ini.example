@@ -9,3 +9,7 @@ password=
 addr=
 port=
 proxy_type= 'socks5' or 'socks4' or 'http'
+[Files]
+base_images_dir = ""
+base_documents_dir = ""
+base_video_dir = ""

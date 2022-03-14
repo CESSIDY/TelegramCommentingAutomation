@@ -29,10 +29,10 @@ def run_and_return_client(config):
 
 
 def main():
-    comments_loader = ListCommentsLoader()
-    channels_loader = ListChannelsLoader()
-
     config = get_configurations()
+
+    comments_loader = ListCommentsLoader(config)
+    channels_loader = ListChannelsLoader()
     client = run_and_return_client(config)
     commentator = Commentator(client, comments_loader, channels_loader)
     commentator.run_until_complete()

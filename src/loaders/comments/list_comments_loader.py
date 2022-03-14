@@ -3,11 +3,9 @@ from .comment_model import CommentLoaderModel, FileTypes
 
 
 class ListCommentsLoader(BaseCommentsLoader):
-    base_images_dir = "C:\\Users\\vrupa\\PycharmProjects\\BWT\\Telegram_Parsing\\Scraper\\TelegramCommentingAutomation\\media\\images"
-    base_documents_dir = "C:\\Users\\vrupa\\PycharmProjects\\BWT\\Telegram_Parsing\\Scraper\\TelegramCommentingAutomation\\media\\documents"
-    base_video_dir = "C:\\Users\\vrupa\\PycharmProjects\\BWT\\Telegram_Parsing\\Scraper\\TelegramCommentingAutomation\\media\\video"
+    def __init__(self, config):
+        super().__init__(config)
 
-    def __init__(self):
         self._comments_list = [
                                CommentLoaderModel(message="Test comment #1",
                                                   file_path=self._image_path("image_2.png"),
