@@ -3,9 +3,7 @@ from .comment_model import CommentLoaderModel, FileTypes
 
 
 class ListCommentsLoader(BaseCommentsLoader):
-    def __init__(self, config):
-        super().__init__(config)
-
+    def __init__(self):
         self._comments_list = [
                                CommentLoaderModel(message="Test comment #1",
                                                   file_path=self._image_path("image_2.png"),
