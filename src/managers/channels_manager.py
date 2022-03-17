@@ -68,7 +68,7 @@ class ChannelsManager:
             return False
 
         for post_message in post_messages:
-            discussion_msg = await self.get_random_discussion_message(channel=channel, messages=[post_message])
+            discussion_msg = await self.get_discussion_message(channel=channel, message=post_message)
 
             if not discussion_msg:
                 logger.error(f"Could not get discussion messages from message({post_message['id']})")
@@ -97,6 +97,7 @@ class ChannelsManager:
         return True
 
     async def get_last_messages_for_discussion(self, discussion_channel, msg_id):
+
         all_messages = await self.get_last_messages(channel=discussion_channel, limit=self.DISCUSSION_MESSAGES_LIMIT)
         discussion_messages = list()
         for message in all_messages:
@@ -136,6 +137,16 @@ class ChannelsManager:
             if limit and total_messages >= limit:
                 break
         return all_messages
+
+    async def get_discussion_message(self, channel, message):
+        try:
+            discussion_msg = await self.client(
+                functions.messages.GetDiscussionMessageRequest(peer=channel.id,
+                                                               msg_id=message['id']))
+            return discussion_msg
+        except Exception as e:
+            logger.warning(e)
+        return
 
     async def get_random_discussion_message(self, channel, messages):
         messages = messages.copy()
