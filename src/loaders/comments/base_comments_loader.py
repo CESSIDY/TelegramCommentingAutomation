@@ -7,8 +7,8 @@ from utils import images_dir, video_dir, documents_dir
 class BaseCommentsLoader(ABC):
     _comments_list: List[CommentLoaderModel]
     base_images_dir = images_dir
-    base_documents_dir = video_dir
-    base_video_dir = documents_dir
+    base_documents_dir = documents_dir
+    base_video_dir = video_dir
 
     @abstractmethod
     def get_all(self) -> List[CommentLoaderModel]:

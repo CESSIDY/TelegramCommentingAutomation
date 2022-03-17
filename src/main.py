@@ -1,6 +1,6 @@
 from commentator import Commentator
-from loaders.channels import ListChannelsLoader
-from loaders.comments import ListCommentsLoader
+from loaders.channels import ListChannelsLoader, JsonChannelsLoader
+from loaders.comments import ListCommentsLoader, JsonCommentsLoader
 import logging
 from utils import get_configurations
 from telethon.sync import TelegramClient
@@ -31,8 +31,8 @@ def run_and_return_client(config):
 def main():
     config = get_configurations()
 
-    comments_loader = ListCommentsLoader()
-    channels_loader = ListChannelsLoader()
+    comments_loader = JsonCommentsLoader()
+    channels_loader = JsonChannelsLoader()
 
     client = run_and_return_client(config)
     commentator = Commentator(client, comments_loader, channels_loader)

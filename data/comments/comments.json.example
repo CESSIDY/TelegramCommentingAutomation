@@ -1,0 +1,19 @@
+[
+  {
+    "message": "Test comment #1",
+    "file_name": "image_1.png",
+    "file_type": "image"
+  },{
+    "message": "Test comment #2",
+    "file_name": "video_1.mp4",
+    "file_type": "video"
+  },{
+    "message": "Test comment #3",
+    "file_name": "document_1.txt",
+    "file_type": "document"
+  },{
+    "message": "Test comment #5",
+    "file_name": "application_1.zip",
+    "file_type": "application"
+  }
+]
