@@ -20,6 +20,7 @@ class JsonChannelsLoader(BaseChannelsLoader):
         channels_list = self._get_channels_from_json_files(json_files)
         channels_models_list = self._convert_channels_list_to_channel_models(channels_list)
 
+        logger.info(f"channels: {len(channels_models_list)}")
         return channels_models_list
 
     def get_all(self) -> List[ChannelLoaderModel]:
@@ -48,7 +49,7 @@ class JsonChannelsLoader(BaseChannelsLoader):
         channels_models_list = []
 
         for channel in channels_list:
-            if channel["id"] and isinstance(channel["private"], bool):
+            if channel.get("id") and isinstance(channel.get("private"), bool):
                 channel_model = ChannelLoaderModel(id=channel["id"], private= channel["private"])
                 channels_models_list.append(channel_model)
             else:

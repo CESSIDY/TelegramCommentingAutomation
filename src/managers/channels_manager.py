@@ -31,7 +31,6 @@ class ChannelsManager:
 
             if channel:
                 channels_list.append(channel)
-        logger.info(f"Channels: {len(channels_list)}")
 
         return channels_list
 

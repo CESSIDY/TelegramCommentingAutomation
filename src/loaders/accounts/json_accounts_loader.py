@@ -19,6 +19,7 @@ class JsonAccountsLoader(BaseAccountsLoader):
         accounts_list = self._get_accounts_from_json_files(json_files)
         account_models_list = self._convert_accounts_list_to_account_models(accounts_list)
 
+        logger.info(f"accounts: {len(account_models_list)}")
         return account_models_list
 
     def get_all(self) -> List[AccountsLoaderModel]:
@@ -47,7 +48,8 @@ class JsonAccountsLoader(BaseAccountsLoader):
         accounts_models_list = []
 
         for account in accounts_list:
-            if account["api_id"] and account["api_hash"] and account["username"] and isinstance(account["api_id"], int):
+            if account.get("api_id") and account.get("api_hash") and account.get("username") \
+                    and isinstance(account.get("api_id"), int):
                 account_model = AccountsLoaderModel(api_id=account["api_id"],
                                                     api_hash=account["api_hash"],
                                                     username=account["username"],

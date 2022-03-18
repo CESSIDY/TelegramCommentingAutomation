@@ -19,6 +19,7 @@ class JsonCommentsLoader(BaseCommentsLoader):
         comments_list = self._get_comments_from_json_files(json_files)
         comments_models_list = self._convert_comments_list_to_comments_models(comments_list)
 
+        logger.info(f"comments: {len(comments_models_list)}")
         return comments_models_list
 
     def _get_all_json_comments_files(self) -> list:
@@ -43,7 +44,7 @@ class JsonCommentsLoader(BaseCommentsLoader):
         comments_models_list = []
 
         for comment in comments_list:
-            if comment["message"]:
+            if comment.get("message"):
                 file_type, file_path = self._load_file_data(comment)
 
                 comment_model = CommentLoaderModel(message=comment["message"],
@@ -59,16 +60,19 @@ class JsonCommentsLoader(BaseCommentsLoader):
         file_type = None
         file_path = None
 
-        if comment["file_type"] == "image":
+        if not comment.get("file_name"):
+            return file_type, file_path
+
+        if comment.get("file_type") == "image":
             file_type = FileTypes.IMAGE
             file_path = self._image_path(comment["file_name"])
-        elif comment["file_type"] == "video":
+        elif comment.get("file_type") == "video":
             file_type = FileTypes.VIDEO
             file_path = self._video_path(comment["file_name"])
-        elif comment["file_type"] == "document":
+        elif comment.get("file_type") == "document":
             file_type = FileTypes.TEXT_DOCUMENT
             file_path = self._doc_path(comment["file_name"])
-        elif comment["file_type"] == "application":
+        elif comment.get("file_type") == "application":
             file_type = FileTypes.APPLICATION_DOCUMENT
             file_path = self._doc_path(comment["file_name"])
         else:
