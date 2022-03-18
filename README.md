@@ -38,6 +38,6 @@ After all configurations:
    1. `cd src`
    2. `poetry run python main.py`
       
-      2.1 then there will be logging in for each account and creating a session file, 
+      2.1 then there will be logging in for each account and creating a session files, 
       for each account you need to specify the phone number to which it was registered, and the code what you will receive from telegram;
       
