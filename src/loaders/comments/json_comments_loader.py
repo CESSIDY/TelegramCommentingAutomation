@@ -34,7 +34,7 @@ class JsonCommentsLoader(BaseCommentsLoader):
     def _get_comments_from_json_files(json_files: list) -> List[dict]:
         data_list = []
         for json_file in json_files:
-            with open(json_file, "r") as file:
+            with open(json_file, mode="r", encoding="utf-8") as file:
                 json_data = file.read()
                 data = json.loads(json_data)
                 data_list.extend(data)
