@@ -7,6 +7,7 @@ import random
 from pprint import pprint
 from telethon.tl.functions.messages import CheckChatInviteRequest
 from telethon.tl.types import Channel
+from telethon.errors import InviteHashExpiredError
 
 logger = logging.getLogger(__name__)
 
@@ -37,16 +38,25 @@ class ChannelsManager:
     async def get_private_channel(self, channel_info):
         channel = None
 
-        channel_invite = await self.client(CheckChatInviteRequest(channel_info.id))
-        if channel_invite:
-            if isinstance(channel_invite, ChatInvite):
-                channel_updates = await self.client(functions.messages.ImportChatInviteRequest(channel_info.id))
-                channel = channel_updates.chats[0]
-            elif isinstance(channel_invite, ChatInviteAlready):
-                channel = channel_invite.chat
-            if channel:
-                channel = await self._get_chat_obj(channel.id)
-        return channel
+        try:
+            channel_invite = await self.client(CheckChatInviteRequest(channel_info.id))
+            if channel_invite:
+                if isinstance(channel_invite, ChatInvite):
+                    channel_updates = await self.client(functions.messages.ImportChatInviteRequest(channel_info.id))
+                    channel = channel_updates.chats[0]
+                elif isinstance(channel_invite, ChatInviteAlready):
+                    channel = channel_invite.chat
+                if channel:
+                    channel = await self._get_chat_obj(channel.id)
+                return channel
+        except InviteHashExpiredError as err:
+            pass
+
+        channels_updates = await self.client(functions.channels.JoinChannelRequest(
+            channel=channel_info.id
+        ))
+
+        return channels_updates.chats[0]
 
     async def get_public_channel(self, channel_info):
         channel = await self._get_chat_obj(channel_info.id)
