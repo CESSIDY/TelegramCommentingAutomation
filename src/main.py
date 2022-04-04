@@ -67,8 +67,8 @@ def run_and_return_client(config, account_model: AccountsLoaderModel):
 if __name__ == "__main__":
     logging.basicConfig(filename="telegram_commentator.log",
                         filemode='a',
-                        format='%(asctime)s,%(msecs)d %(name)s [%(levelname)s]: %(message)s',
-                        datefmt='%H:%M:%S',
+                        format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+                        datefmt='%Y-%m-%d:%H:%M:%S',
                         level=logging.INFO)
 
     main()

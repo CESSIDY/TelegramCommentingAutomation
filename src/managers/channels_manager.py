@@ -1,5 +1,6 @@
 from loaders.channels import BaseChannelsLoader
 from loaders.comments import CommentLoaderModel, FileTypes
+from typing import List
 from telethon.tl import functions, types
 from telethon.tl.types import Updates, ChatInviteAlready, ChatInvite, InputFile, DocumentAttributeVideo, DocumentAttributeFilename
 import logging
@@ -7,7 +8,7 @@ import random
 from pprint import pprint
 from telethon.tl.functions.messages import CheckChatInviteRequest
 from telethon.tl.types import Channel
-from telethon.errors import InviteHashExpiredError
+from telethon.errors import InviteHashExpiredError, ChatWriteForbiddenError
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class ChannelsManager:
         self.channels_list = self._get_channels_objects(channels_loader_adaptor)
         self.client = client
         self.user_owner = self.client.get_me()
+        self.comments: List[CommentLoaderModel] = None
 
     async def _get_channels_objects(self, channels_loader: BaseChannelsLoader) -> list:
         channels_list = list()
@@ -62,7 +64,8 @@ class ChannelsManager:
         channel = await self._get_chat_obj(channel_info.id)
         return channel
 
-    async def start_commenting(self, comments: list):
+    async def start_commenting(self, comments: List[CommentLoaderModel]):
+        self.comments = comments
         for channel in await self.channels_list:
             logger.info(f"Try left comment to channel({channel.title}/{channel.id})")
             comment = random.choices(comments)[0]
@@ -207,19 +210,37 @@ class ChannelsManager:
                             )
 
                 if media:
-                    result = await self.client(functions.messages.SendMediaRequest(
-                        peer=channel,
-                        media=media,
-                        message=comment.message,
-                        reply_to_msg_id=message_id))
+                    result = await self._try_send_message(peer=channel,
+                                                          media=media,
+                                                          message=comment.message,
+                                                          reply_to_msg_id=message_id)
             else:
-                result = await self.client(functions.messages.SendMessageRequest(peer=channel,
-                                                                                 message=comment.message,
-                                                                                 reply_to_msg_id=message_id))
+                result = await self._try_send_message(peer=channel,
+                                                      message=comment.message,
+                                                      reply_to_msg_id=message_id)
             return result
         except Exception as e:
             logger.error(e)
         return
+
+    async def _try_send_message(self, **kwargs):
+        text_message = kwargs.get("message")
+
+        if kwargs.get("media"):
+            try:
+                result = await self.client(functions.messages.SendMediaRequest(**kwargs))
+                return result
+            except Exception as e:
+                logger.warning(e)
+                logger.info("Try send text message")
+                for comment in self.comments:
+                    if not comment.file_type:
+                        text_message = comment.message
+                        break
+        result = await self.client(functions.messages.SendMessageRequest(peer=kwargs.get("peer"),
+                                                                         message=text_message,
+                                                                         reply_to_msg_id=kwargs.get("reply_to_msg_id")))
+        return result
 
     async def _get_full_chat_obj(self, channel_id):
         try:
