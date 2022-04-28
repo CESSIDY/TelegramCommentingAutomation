@@ -1,5 +1,5 @@
 from . import BaseChannelsLoader
-from .channel_model import ChannelLoaderModel
+from models import ChannelLoaderModel
 
 
 class ListChannelsLoader(BaseChannelsLoader):

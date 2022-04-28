@@ -1,12 +1,11 @@
 from loaders.channels import BaseChannelsLoader
-from loaders.comments import CommentLoaderModel, FileTypes
-from typing import List
-from telethon.tl import functions, types
-from telethon.tl.types import ChatInviteAlready, ChatInvite, DocumentAttributeFilename
+from telethon.tl import functions
+from telethon.tl.types import ChatInviteAlready, ChatInvite
 import logging
 import random
 from telethon.tl.functions.messages import CheckChatInviteRequest
 from telethon.errors import InviteHashExpiredError
+from .media_manager import MediaManager
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +17,7 @@ class ChannelsManager:
     def __init__(self, client, channels_loader_adaptor: BaseChannelsLoader):
         self.channels_list = self._get_channels_objects(channels_loader_adaptor)
         self.client = client
+        self.media_manager = MediaManager(self.client)
         self.user_owner = self.client.get_me()
 
     async def _get_channels_objects(self, channels_loader: BaseChannelsLoader) -> list:
@@ -41,12 +41,15 @@ class ChannelsManager:
         channel = None
 
         try:
+            # Try get channel invite object by hash_id
             channel_invite = await self.client(CheckChatInviteRequest(channel_info.id))
             if channel_invite:
                 if isinstance(channel_invite, ChatInvite):
+                    # If channel_invite is not expired we can try join to the channel
                     channel_updates = await self.client(functions.messages.ImportChatInviteRequest(channel_info.id))
                     channel = channel_updates.chats[0]
                 elif isinstance(channel_invite, ChatInviteAlready):
+                    # Account already subscribe to the channel and we can just get channel object from channel_invite
                     channel = channel_invite.chat
                 if channel:
                     channel = await self.get_chat_obj(channel.id)
@@ -54,6 +57,7 @@ class ChannelsManager:
         except InviteHashExpiredError as err:
             pass
 
+        # If invite hash expired than we can try just join to channels by request
         channels_updates = await self.client(functions.channels.JoinChannelRequest(
             channel=channel_info.id
         ))
@@ -138,56 +142,23 @@ class ChannelsManager:
                 logger.warning(e)
         return
 
-    async def commenting_message(self, channel, comment, comments, message_id):
-        try:
-            result = None
-            if comment.file_path:
-                media = None
-                file_name = comment.file_path.split("\\")[-1]
-                file_extension = comment.file_path.split(".")[-1]
+    async def commenting_post(self, channel, comment, comments, post_id):
+        result = None
+        if comment.media:
+            media = await self.media_manager.get_media_object(comment.media)
 
-                if comment.file_type == FileTypes.IMAGE:
-                    media = types.InputMediaUploadedPhoto(
-                        file=await self.client.upload_file(comment.file_path),
-                        ttl_seconds=42
-                    )
-                elif comment.file_type == FileTypes.TEXT_DOCUMENT:
-                    media = types.InputMediaUploadedDocument(
-                        file=await self.client.upload_file(comment.file_path),
-                        ttl_seconds=42,
-                        mime_type=f'text/{file_extension}',
-                        attributes=[DocumentAttributeFilename(file_name)]
-                    )
-                elif comment.file_type == FileTypes.APPLICATION_DOCUMENT:
-                    media = types.InputMediaUploadedDocument(
-                        file=await self.client.upload_file(comment.file_path),
-                        ttl_seconds=42,
-                        mime_type=f'application/{file_extension}',
-                        attributes=[DocumentAttributeFilename(file_name)]
-                    )
-                elif comment.file_type == FileTypes.VIDEO:
-                    media = types.InputMediaUploadedDocument(
-                        file=await self.client.upload_file(comment.file_path),
-                        ttl_seconds=42,
-                        mime_type=f'video/{file_extension}',
-                        attributes=[DocumentAttributeFilename(file_name)]
-                    )
-
-                if media:
-                    result = await self._try_send_message_with_retry(peer=channel,
-                                                                     media=media,
-                                                                     message=comment.message,
-                                                                     reply_to_msg_id=message_id,
-                                                                     comments=comments)
-            else:
+            if media:
                 result = await self._try_send_message_with_retry(peer=channel,
+                                                                 media=media,
                                                                  message=comment.message,
-                                                                 reply_to_msg_id=message_id,
+                                                                 reply_to_msg_id=post_id,
                                                                  comments=comments)
-            return result
-        except Exception as e:
-            logger.error(e)
-        return
+        else:
+            result = await self._try_send_message_with_retry(peer=channel,
+                                                             message=comment.message,
+                                                             reply_to_msg_id=post_id,
+                                                             comments=comments)
+        return result
 
     async def _try_send_message_with_retry(self, **kwargs):
         text_message = kwargs.get("message")
@@ -202,13 +173,18 @@ class ChannelsManager:
                 logger.info("Try send text message")
 
                 for comment in comments:
-                    if not comment.file_type:
+                    if not comment.media:
                         text_message = comment.message
                         break
-        result = await self.client(functions.messages.SendMessageRequest(peer=kwargs.get("peer"),
-                                                                         message=text_message,
-                                                                         reply_to_msg_id=kwargs.get("reply_to_msg_id")))
-        return result
+        try:
+            result = await self.client(functions.messages.SendMessageRequest(peer=kwargs.get("peer"),
+                                                                             message=text_message,
+                                                                             reply_to_msg_id=kwargs.get(
+                                                                                 "reply_to_msg_id")))
+            return result
+        except Exception as e:
+            logger.warning(e)
+        return
 
     async def get_full_chat_obj(self, channel_id):
         try:

@@ -1,10 +1,12 @@
 from loaders.channels import BaseChannelsLoader
-from loaders.comments import BaseCommentsLoader, CommentLoaderModel, FileTypes
+from loaders.comments import BaseCommentsLoader
+from models import CommentLoaderModel, FileTypes
 from managers import ChannelsManager
 from typing import List
 import logging
 import random
 from enum import Enum
+from .base_worker import BaseWorker
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +18,7 @@ class CommentsChoosingMode(Enum):
     IMAGE_PREFER = 4
 
 
-class Commentator:
+class Commentator(BaseWorker):
     POST_MESSAGES_LIMIT = 10
     COMMENT_CHOOSING_MODE = CommentsChoosingMode.RANDOM
 
@@ -39,8 +41,8 @@ class Commentator:
 
             _ = await self.commenting_last_uncommenting_message(channel, limit=self.POST_MESSAGES_LIMIT)
 
-    async def commenting_last_uncommenting_message(self, channel, limit):
-        comment = await self._get_comments(self.comments, self.COMMENT_CHOOSING_MODE)
+    async def commenting_last_uncommenting_message(self, channel, limit) -> bool:
+        comment = await self._get_comment()
 
         post_messages = await self.channels_manager.get_last_messages(channel=channel, limit=limit)
 
@@ -55,7 +57,7 @@ class Commentator:
         logger.warning(f"Could not leave comment under any message in channel({channel.title}/{channel.id})!")
         return False
 
-    async def send_comment_to_post(self, channel, comment, post_message):
+    async def send_comment_to_post(self, channel, comment, post_message) -> bool:
         discussion_msg = await self.channels_manager.get_discussion_message(channel=channel, message=post_message)
 
         if not discussion_msg:
@@ -65,11 +67,10 @@ class Commentator:
         discussion_channel = await self.channels_manager.get_chat_obj(discussion_msg.chats[0].id)
 
         if await self.channels_manager.is_not_commenting_post(discussion_channel, discussion_msg.messages[0].id):
-            commenting_result = await self.channels_manager.commenting_message(channel=discussion_channel,
-                                                                               comment=comment,
-                                                                               comments=self.comments,
-                                                                               message_id=discussion_msg.messages[
-                                                                                   0].id)
+            commenting_result = await self.channels_manager.commenting_post(channel=discussion_channel,
+                                                                            comment=comment,
+                                                                            comments=self.comments,
+                                                                            post_id=discussion_msg.messages[0].id)
             if not commenting_result:
                 logger.warning(
                     f"Could not leave a comment message({discussion_msg.messages[0].id}) in channel({channel.title}/{channel.id})")
@@ -78,27 +79,16 @@ class Commentator:
             return True
         return False
 
-    @staticmethod
-    async def _get_comments(comments: List[CommentLoaderModel], choosing_flag: CommentsChoosingMode):
-        if comments:
-            comment_result = comments[0]
-            if choosing_flag == CommentsChoosingMode.RANDOM:
-                comment_result = random.choices(comments)[0]
-            elif choosing_flag == CommentsChoosingMode.TEXT_PREFER:
-                for comment in comments:
-                    if not comment.file_path and comment.message:
-                        comment_result = comment
-                        break
-            elif choosing_flag == CommentsChoosingMode.IMAGE_PREFER:
-                for comment in comments:
-                    if comment.file_path == FileTypes.IMAGE:
-                        comment_result = comment
-                        break
-            elif choosing_flag == CommentsChoosingMode.VIDEO_PREFER:
-                for comment in comments:
-                    if comment.file_path == FileTypes.VIDEO:
-                        comment_result = comment
-                        break
-            return comment_result
-        logger.error("List of comments is empty")
-        return None
+    async def _get_comment(self) -> CommentLoaderModel:
+        comment_result = self.comments_loader.get_first_comment()
+
+        if self.COMMENT_CHOOSING_MODE == CommentsChoosingMode.RANDOM:
+            comment_result = self.comments_loader.get_random_comment()
+        elif self.COMMENT_CHOOSING_MODE == CommentsChoosingMode.TEXT_PREFER:
+            comment_result = self.comments_loader.get_text_comment()
+        elif self.COMMENT_CHOOSING_MODE == CommentsChoosingMode.IMAGE_PREFER:
+            comment_result = self.comments_loader.get_image_comment()
+        elif self.COMMENT_CHOOSING_MODE == CommentsChoosingMode.VIDEO_PREFER:
+            comment_result = self.comments_loader.get_video_comment()
+
+        return comment_result

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List
-from .channel_model import ChannelLoaderModel
+from models import ChannelLoaderModel
 
 
 class BaseChannelsLoader(ABC):

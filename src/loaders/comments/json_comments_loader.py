@@ -1,5 +1,5 @@
 from . import BaseCommentsLoader
-from .comment_model import CommentLoaderModel, FileTypes
+from models import CommentLoaderModel, FileTypes, MediaModel
 import os
 import json
 import logging
@@ -12,7 +12,7 @@ class JsonCommentsLoader(BaseCommentsLoader):
     def __init__(self):
         self.base_comments_path = os.path.abspath(os.path.join(os.path.realpath(__file__),
                                                                "..", "..", "..", "..", "data", "comments"))
-        self._comments_models_list = self._get_all_comments()
+        self._comments_list = self._get_all_comments()
 
     def _get_all_comments(self) -> List[CommentLoaderModel]:
         json_files = self._get_all_json_comments_files()
@@ -47,9 +47,8 @@ class JsonCommentsLoader(BaseCommentsLoader):
             if comment.get("message"):
                 file_type, file_path = self._load_file_data(comment)
 
-                comment_model = CommentLoaderModel(message=comment["message"],
-                                                   file_path=file_path,
-                                                   file_type=file_type)
+                media = MediaModel(file_path=file_path, file_type=file_type)
+                comment_model = CommentLoaderModel(message=comment["message"], media=media)
 
                 comments_models_list.append(comment_model)
             else:
@@ -90,4 +89,4 @@ class JsonCommentsLoader(BaseCommentsLoader):
         return f"{self.base_video_dir}\\{file_name}"
 
     def get_all(self) -> List[CommentLoaderModel]:
-        return self._comments_models_list
+        return self._comments_list

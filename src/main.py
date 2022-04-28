@@ -1,11 +1,12 @@
-from commentator import Commentator
+import logging
+import os
+from telethon.sync import TelegramClient
+from loaders.accounts import JsonAccountsLoader
 from loaders.channels import JsonChannelsLoader
 from loaders.comments import JsonCommentsLoader
-from loaders.accounts import JsonAccountsLoader, AccountsLoaderModel
-import logging
+from models import AccountsLoaderModel
 from utils import get_configurations
-from telethon.sync import TelegramClient
-import os
+from workers.commentator import Commentator
 
 
 def main():
