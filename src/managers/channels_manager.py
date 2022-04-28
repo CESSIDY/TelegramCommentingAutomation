@@ -2,13 +2,11 @@ from loaders.channels import BaseChannelsLoader
 from loaders.comments import CommentLoaderModel, FileTypes
 from typing import List
 from telethon.tl import functions, types
-from telethon.tl.types import Updates, ChatInviteAlready, ChatInvite, InputFile, DocumentAttributeVideo, DocumentAttributeFilename
+from telethon.tl.types import ChatInviteAlready, ChatInvite, DocumentAttributeFilename
 import logging
 import random
-from pprint import pprint
 from telethon.tl.functions.messages import CheckChatInviteRequest
-from telethon.tl.types import Channel
-from telethon.errors import InviteHashExpiredError, ChatWriteForbiddenError
+from telethon.errors import InviteHashExpiredError
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +19,6 @@ class ChannelsManager:
         self.channels_list = self._get_channels_objects(channels_loader_adaptor)
         self.client = client
         self.user_owner = self.client.get_me()
-        self.comments: List[CommentLoaderModel] = None
 
     async def _get_channels_objects(self, channels_loader: BaseChannelsLoader) -> list:
         channels_list = list()
@@ -37,6 +34,9 @@ class ChannelsManager:
 
         return channels_list
 
+    async def get_channels(self):
+        return self.channels_list
+
     async def get_private_channel(self, channel_info):
         channel = None
 
@@ -49,7 +49,7 @@ class ChannelsManager:
                 elif isinstance(channel_invite, ChatInviteAlready):
                     channel = channel_invite.chat
                 if channel:
-                    channel = await self._get_chat_obj(channel.id)
+                    channel = await self.get_chat_obj(channel.id)
                 return channel
         except InviteHashExpiredError as err:
             pass
@@ -61,44 +61,8 @@ class ChannelsManager:
         return channels_updates.chats[0]
 
     async def get_public_channel(self, channel_info):
-        channel = await self._get_chat_obj(channel_info.id)
+        channel = await self.get_chat_obj(channel_info.id)
         return channel
-
-    async def start_commenting(self, comments: List[CommentLoaderModel]):
-        self.comments = comments
-        for channel in await self.channels_list:
-            logger.info(f"Try left comment to channel({channel.title}/{channel.id})")
-            comment = random.choices(comments)[0]
-
-            result = await self.commenting_last_uncommenting_message(channel, comment, limit=10)
-
-    async def commenting_last_uncommenting_message(self, channel, comment, limit=1):
-        post_messages = await self.get_last_messages(channel=channel, limit=limit)
-
-        if not post_messages:
-            logger.warning(f"Empty posts list in channel({channel.title}/{channel.id})")
-            return False
-
-        for post_message in post_messages:
-            discussion_msg = await self.get_discussion_message(channel=channel, message=post_message)
-
-            if not discussion_msg:
-                logger.error(f"Could not get discussion messages from message({post_message['id']})")
-                continue
-
-            discussion_channel = await self._get_chat_obj(discussion_msg.chats[0].id)
-
-            if await self.is_not_commenting_post(discussion_channel, discussion_msg.messages[0].id):
-                commenting_result = await self.commenting_message(channel=discussion_channel, comment=comment,
-                                                                  message_id=discussion_msg.messages[0].id)
-                if not commenting_result:
-                    logger.warning(
-                        f"Could not leave a comment message({discussion_msg.messages[0].id}) in channel({channel.title}/{channel.id})")
-                    continue
-                logger.info(f"Successfully added comment to channel({channel.title}/{channel.id})!")
-                return True
-        logger.warning(f"Could not leave comment under any message in channel({channel.title}/{channel.id})!")
-        return False
 
     async def is_not_commenting_post(self, discussion_channel, msg_id):
         discussion_messages = await self.get_last_messages_for_discussion(discussion_channel, msg_id)
@@ -174,7 +138,7 @@ class ChannelsManager:
                 logger.warning(e)
         return
 
-    async def commenting_message(self, channel, comment, message_id):
+    async def commenting_message(self, channel, comment, comments, message_id):
         try:
             result = None
             if comment.file_path:
@@ -184,47 +148,50 @@ class ChannelsManager:
 
                 if comment.file_type == FileTypes.IMAGE:
                     media = types.InputMediaUploadedPhoto(
-                                file=await self.client.upload_file(comment.file_path),
-                                ttl_seconds=42
-                            )
+                        file=await self.client.upload_file(comment.file_path),
+                        ttl_seconds=42
+                    )
                 elif comment.file_type == FileTypes.TEXT_DOCUMENT:
                     media = types.InputMediaUploadedDocument(
-                                file=await self.client.upload_file(comment.file_path),
-                                ttl_seconds=42,
-                                mime_type=f'text/{file_extension}',
-                                attributes=[DocumentAttributeFilename(file_name)]
-                            )
+                        file=await self.client.upload_file(comment.file_path),
+                        ttl_seconds=42,
+                        mime_type=f'text/{file_extension}',
+                        attributes=[DocumentAttributeFilename(file_name)]
+                    )
                 elif comment.file_type == FileTypes.APPLICATION_DOCUMENT:
                     media = types.InputMediaUploadedDocument(
-                                file=await self.client.upload_file(comment.file_path),
-                                ttl_seconds=42,
-                                mime_type=f'application/{file_extension}',
-                                attributes=[DocumentAttributeFilename(file_name)]
-                            )
+                        file=await self.client.upload_file(comment.file_path),
+                        ttl_seconds=42,
+                        mime_type=f'application/{file_extension}',
+                        attributes=[DocumentAttributeFilename(file_name)]
+                    )
                 elif comment.file_type == FileTypes.VIDEO:
                     media = types.InputMediaUploadedDocument(
-                                file=await self.client.upload_file(comment.file_path),
-                                ttl_seconds=42,
-                                mime_type=f'video/{file_extension}',
-                                attributes=[DocumentAttributeFilename(file_name)]
-                            )
+                        file=await self.client.upload_file(comment.file_path),
+                        ttl_seconds=42,
+                        mime_type=f'video/{file_extension}',
+                        attributes=[DocumentAttributeFilename(file_name)]
+                    )
 
                 if media:
-                    result = await self._try_send_message(peer=channel,
-                                                          media=media,
-                                                          message=comment.message,
-                                                          reply_to_msg_id=message_id)
+                    result = await self._try_send_message_with_retry(peer=channel,
+                                                                     media=media,
+                                                                     message=comment.message,
+                                                                     reply_to_msg_id=message_id,
+                                                                     comments=comments)
             else:
-                result = await self._try_send_message(peer=channel,
-                                                      message=comment.message,
-                                                      reply_to_msg_id=message_id)
+                result = await self._try_send_message_with_retry(peer=channel,
+                                                                 message=comment.message,
+                                                                 reply_to_msg_id=message_id,
+                                                                 comments=comments)
             return result
         except Exception as e:
             logger.error(e)
         return
 
-    async def _try_send_message(self, **kwargs):
+    async def _try_send_message_with_retry(self, **kwargs):
         text_message = kwargs.get("message")
+        comments = kwargs.pop("comments", [])
 
         if kwargs.get("media"):
             try:
@@ -233,7 +200,8 @@ class ChannelsManager:
             except Exception as e:
                 logger.warning(e)
                 logger.info("Try send text message")
-                for comment in self.comments:
+
+                for comment in comments:
                     if not comment.file_type:
                         text_message = comment.message
                         break
@@ -242,7 +210,7 @@ class ChannelsManager:
                                                                          reply_to_msg_id=kwargs.get("reply_to_msg_id")))
         return result
 
-    async def _get_full_chat_obj(self, channel_id):
+    async def get_full_chat_obj(self, channel_id):
         try:
             channel_obj = await self.client(functions.channels.GetFullChannelRequest(
                 channel=channel_id
@@ -253,7 +221,7 @@ class ChannelsManager:
 
         return channel_obj
 
-    async def _get_chat_obj(self, channel_id):
+    async def get_chat_obj(self, channel_id):
         try:
             channel_obj = await self.client(functions.channels.GetChannelsRequest(
                 id=[channel_id]

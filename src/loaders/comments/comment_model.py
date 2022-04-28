@@ -28,5 +28,6 @@ class CommentLoaderModel:
     def _check_if_file_exists(file_path):
         if file_path and exists(file_path):
             return file_path
-        logger.warning(f"File does not exist: {file_path}")
+        elif file_path:
+            logger.warning(f"File does not exist: {file_path}")
         return None
