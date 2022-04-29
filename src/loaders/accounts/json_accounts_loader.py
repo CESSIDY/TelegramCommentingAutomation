@@ -12,18 +12,15 @@ class JsonAccountsLoader(BaseAccountsLoader):
     def __init__(self):
         self.base_accounts_path = os.path.abspath(os.path.join(os.path.realpath(__file__),
                                                                "..", "..", "..", "..", "data", "accounts"))
-        self._accounts_list = self._get_all_accounts()
+        super(JsonAccountsLoader, self).__init__()
 
-    def _get_all_accounts(self) -> List[AccountsLoaderModel]:
+    def _parse_all_accounts(self) -> List[AccountsLoaderModel]:
         json_files = self._get_all_json_accounts_files()
         accounts_list = self._get_accounts_from_json_files(json_files)
         account_models_list = self._convert_accounts_list_to_account_models(accounts_list)
 
         logger.info(f"accounts: {len(account_models_list)}")
         return account_models_list
-
-    def get_all(self) -> List[AccountsLoaderModel]:
-        return self._accounts_list
 
     def _get_all_json_accounts_files(self) -> list:
         json_files = []

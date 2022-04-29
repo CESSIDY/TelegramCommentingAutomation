@@ -12,9 +12,9 @@ class JsonCommentsLoader(BaseCommentsLoader):
     def __init__(self):
         self.base_comments_path = os.path.abspath(os.path.join(os.path.realpath(__file__),
                                                                "..", "..", "..", "..", "data", "comments"))
-        self._comments_list = self._get_all_comments()
+        super(JsonCommentsLoader, self).__init__()
 
-    def _get_all_comments(self) -> List[CommentLoaderModel]:
+    def _parse_all_comments(self) -> List[CommentLoaderModel]:
         json_files = self._get_all_json_comments_files()
         comments_list = self._get_comments_from_json_files(json_files)
         comments_models_list = self._convert_comments_list_to_comments_models(comments_list)
@@ -78,15 +78,3 @@ class JsonCommentsLoader(BaseCommentsLoader):
             logger.warning(f"Can't load file_type from obj: {comment} "
                            f"it needs to be one of those: ['image', 'video', 'document', 'application']")
         return file_type, file_path
-
-    def _doc_path(self, file_name):
-        return f"{self.base_documents_dir}\\{file_name}"
-
-    def _image_path(self, file_name):
-        return f"{self.base_images_dir}\\{file_name}"
-
-    def _video_path(self, file_name):
-        return f"{self.base_video_dir}\\{file_name}"
-
-    def get_all(self) -> List[CommentLoaderModel]:
-        return self._comments_list

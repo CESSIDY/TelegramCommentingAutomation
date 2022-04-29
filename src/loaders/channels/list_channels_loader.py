@@ -1,12 +1,13 @@
 from . import BaseChannelsLoader
 from models import ChannelLoaderModel
+from typing import List
 
 
 class ListChannelsLoader(BaseChannelsLoader):
 
     def __init__(self):
-        self._channels_ids_list = [ChannelLoaderModel(id="bwt_commentator_test_1", private=False),
-                                   ChannelLoaderModel(id="If7N8EnSEWViYzgy", private=True)]
+        super(ListChannelsLoader, self).__init__()
 
-    def get_all(self) -> list:
-        return self._channels_ids_list
+    def _parse_all_comments(self) -> List[ChannelLoaderModel]:
+        return [ChannelLoaderModel(id="bwt_commentator_test_1", private=False),
+                ChannelLoaderModel(id="If7N8EnSEWViYzgy", private=True)]

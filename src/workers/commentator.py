@@ -28,7 +28,6 @@ class Commentator(BaseWorker):
         self.channels_loader = channels_loader_adaptor
         self.client = client
         self.channels_manager = ChannelsManager(client=self.client, channels_loader_adaptor=self.channels_loader)
-        self.comments: List[CommentLoaderModel] = self.comments_loader.get_all()
 
     def run_until_complete(self):
         with self.client:
@@ -69,7 +68,7 @@ class Commentator(BaseWorker):
         if await self.channels_manager.is_not_commenting_post(discussion_channel, discussion_msg.messages[0].id):
             commenting_result = await self.channels_manager.commenting_post(channel=discussion_channel,
                                                                             comment=comment,
-                                                                            comments=self.comments,
+                                                                            comments_loader=self.comments_loader,
                                                                             post_id=discussion_msg.messages[0].id)
             if not commenting_result:
                 logger.warning(

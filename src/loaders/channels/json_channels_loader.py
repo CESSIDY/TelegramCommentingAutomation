@@ -13,18 +13,15 @@ class JsonChannelsLoader(BaseChannelsLoader):
     def __init__(self):
         self.base_channels_path = os.path.abspath(os.path.join(os.path.realpath(__file__),
                                                                "..", "..", "..", "..", "data", "channels"))
-        self._channels_models_list = self._get_all_channels()
+        super(JsonChannelsLoader, self).__init__()
 
-    def _get_all_channels(self) -> List[ChannelLoaderModel]:
+    def _parse_all_comments(self) -> List[ChannelLoaderModel]:
         json_files = self._get_all_json_channels_files()
         channels_list = self._get_channels_from_json_files(json_files)
         channels_models_list = self._convert_channels_list_to_channel_models(channels_list)
 
         logger.info(f"channels: {len(channels_models_list)}")
         return channels_models_list
-
-    def get_all(self) -> List[ChannelLoaderModel]:
-        return self._channels_models_list
 
     def _get_all_json_channels_files(self) -> list:
         json_files = []

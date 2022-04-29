@@ -4,12 +4,14 @@ from models import ChannelLoaderModel
 
 
 class BaseChannelsLoader(ABC):
-    _channels_ids_list: List[ChannelLoaderModel]
+    _channels_models_list: List[ChannelLoaderModel]
 
-    @abstractmethod
     def __init__(self):
-        pass
+        self._channels_models_list = self._parse_all_comments()
+
+    def get_all(self) -> List[ChannelLoaderModel]:
+        return self._channels_models_list
 
     @abstractmethod
-    def get_all(self) -> List[ChannelLoaderModel]:
+    def _parse_all_comments(self) -> List[ChannelLoaderModel]:
         pass

@@ -142,7 +142,7 @@ class ChannelsManager:
                 logger.warning(e)
         return
 
-    async def commenting_post(self, channel, comment, comments, post_id):
+    async def commenting_post(self, channel, comment, comments_loader, post_id):
         result = None
         if comment.media:
             media = await self.media_manager.get_media_object(comment.media)
@@ -152,17 +152,17 @@ class ChannelsManager:
                                                                  media=media,
                                                                  message=comment.message,
                                                                  reply_to_msg_id=post_id,
-                                                                 comments=comments)
+                                                                 comments_loader=comments_loader)
         else:
             result = await self._try_send_message_with_retry(peer=channel,
                                                              message=comment.message,
                                                              reply_to_msg_id=post_id,
-                                                             comments=comments)
+                                                             comments_loader=comments_loader)
         return result
 
     async def _try_send_message_with_retry(self, **kwargs):
         text_message = kwargs.get("message")
-        comments = kwargs.pop("comments", [])
+        comments_loader = kwargs.pop("comments_loader", [])
 
         if kwargs.get("media"):
             try:
@@ -172,10 +172,10 @@ class ChannelsManager:
                 logger.warning(e)
                 logger.info("Try send text message")
 
-                for comment in comments:
-                    if not comment.media:
-                        text_message = comment.message
-                        break
+                comment = comments_loader.get_text_comment()
+                if comment:
+                    text_message = comment.message
+
         try:
             result = await self.client(functions.messages.SendMessageRequest(peer=kwargs.get("peer"),
                                                                              message=text_message,
