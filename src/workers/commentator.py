@@ -1,21 +1,10 @@
 from loaders.channels import BaseChannelsLoader
-from loaders.comments import BaseCommentsLoader
-from models import CommentLoaderModel, FileTypes
+from loaders.comments import BaseCommentsLoader, CommentsChoosingMode
 from managers import ChannelsManager
-from typing import List
 import logging
-import random
-from enum import Enum
 from .base_worker import BaseWorker
 
 logger = logging.getLogger(__name__)
-
-
-class CommentsChoosingMode(Enum):
-    RANDOM = 1
-    TEXT_PREFER = 2
-    VIDEO_PREFER = 3
-    IMAGE_PREFER = 4
 
 
 class Commentator(BaseWorker):
@@ -41,7 +30,7 @@ class Commentator(BaseWorker):
             _ = await self.commenting_last_uncommenting_message(channel, limit=self.POST_MESSAGES_LIMIT)
 
     async def commenting_last_uncommenting_message(self, channel, limit) -> bool:
-        comment = await self._get_comment()
+        comment = self.comments_loader.get_comment_by_mode(mode=self.COMMENT_CHOOSING_MODE)
 
         post_messages = await self.channels_manager.get_last_messages(channel=channel, limit=limit)
 
@@ -77,17 +66,3 @@ class Commentator(BaseWorker):
             logger.info(f"Successfully added comment to channel({channel.title}/{channel.id})!")
             return True
         return False
-
-    async def _get_comment(self) -> CommentLoaderModel:
-        comment_result = self.comments_loader.get_first_comment()
-
-        if self.COMMENT_CHOOSING_MODE == CommentsChoosingMode.RANDOM:
-            comment_result = self.comments_loader.get_random_comment()
-        elif self.COMMENT_CHOOSING_MODE == CommentsChoosingMode.TEXT_PREFER:
-            comment_result = self.comments_loader.get_text_comment()
-        elif self.COMMENT_CHOOSING_MODE == CommentsChoosingMode.IMAGE_PREFER:
-            comment_result = self.comments_loader.get_image_comment()
-        elif self.COMMENT_CHOOSING_MODE == CommentsChoosingMode.VIDEO_PREFER:
-            comment_result = self.comments_loader.get_video_comment()
-
-        return comment_result

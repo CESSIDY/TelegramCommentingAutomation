@@ -8,6 +8,13 @@ from models import AccountsLoaderModel
 from utils import get_configurations
 from workers.commentator import Commentator
 
+logging.basicConfig(filename="telegram_commentator.log",
+                        filemode='a',
+                        format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+                        datefmt='%Y-%m-%d:%H:%M:%S',
+                        level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 def main():
     config = get_configurations()
@@ -17,15 +24,24 @@ def main():
     accounts_loader = JsonAccountsLoader()
     account_models = accounts_loader.get_all()
 
-    init_sessions(account_models, config)
+    account_models = check_and_init_sessions(account_models, config)
     run_commentator_for_all_accounts(account_models, config, comments_loader, channels_loader)
 
 
-def init_sessions(account_models, config):
+def check_and_init_sessions(account_models, config) -> [AccountsLoaderModel]:
+    temp_account_models = list()
+
     for account in account_models:
         print(f"Login for: {account.username}")
-        client = run_and_return_client(config, account)
-        client.disconnect()
+        try:
+            client = run_and_return_client(config, account)
+            client.disconnect()
+            temp_account_models.append(account)
+        except Exception as e:
+            print(f"Authorization error for {account.username}")
+            logger.error(e)
+
+    return temp_account_models
 
 
 def run_commentator_for_all_accounts(account_models, config, comments_loader, channels_loader):
@@ -66,10 +82,4 @@ def run_and_return_client(config, account_model: AccountsLoaderModel):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(filename="telegram_commentator.log",
-                        filemode='a',
-                        format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
-                        datefmt='%Y-%m-%d:%H:%M:%S',
-                        level=logging.INFO)
-
     main()

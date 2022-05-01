@@ -4,8 +4,16 @@ from utils import images_dir, video_dir, documents_dir
 import random
 import logging
 from models import MediaModel, FileTypes, CommentLoaderModel
+from enum import Enum
 
 logger = logging.getLogger(__name__)
+
+
+class CommentsChoosingMode(Enum):
+    RANDOM = 1
+    TEXT_PREFER = 2
+    VIDEO_PREFER = 3
+    IMAGE_PREFER = 4
 
 
 class BaseCommentsLoader(ABC):
@@ -19,6 +27,20 @@ class BaseCommentsLoader(ABC):
 
     def get_all(self) -> List[CommentLoaderModel]:
         return self._comments_list
+
+    def get_comment_by_mode(self, mode: CommentsChoosingMode) -> CommentLoaderModel:
+        comment_result = self.get_first_comment()
+
+        if mode == CommentsChoosingMode.RANDOM:
+            comment_result = self.get_random_comment()
+        elif mode == CommentsChoosingMode.TEXT_PREFER:
+            comment_result = self.get_text_comment()
+        elif mode == CommentsChoosingMode.IMAGE_PREFER:
+            comment_result = self.get_image_comment()
+        elif mode == CommentsChoosingMode.VIDEO_PREFER:
+            comment_result = self.get_video_comment()
+
+        return comment_result
 
     @abstractmethod
     def _parse_all_comments(self) -> List[CommentLoaderModel]:
