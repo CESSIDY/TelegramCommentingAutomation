@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 class Commentator(BaseWorker):
-    POST_MESSAGES_LIMIT = 10
-    COMMENT_CHOOSING_MODE = CommentsChoosingMode.RANDOM
+    POST_MESSAGES_LIMIT = 10  # Limit the number of posts we will review
+    COMMENT_CHOOSING_MODE = CommentsChoosingMode.RANDOM  # Mode for selecting one comment from all
 
     def __init__(self, client, comments_loader_adaptor: BaseCommentsLoader,
                  channels_loader_adaptor: BaseChannelsLoader):
@@ -27,12 +27,12 @@ class Commentator(BaseWorker):
         for channel in await channels:
             logger.info(f"Try left comment to channel({channel.title}/{channel.id})")
 
-            _ = await self.commenting_last_uncommenting_message(channel, limit=self.POST_MESSAGES_LIMIT)
+            _ = await self.commenting_last_uncommenting_message(channel)
 
-    async def commenting_last_uncommenting_message(self, channel, limit) -> bool:
+    async def commenting_last_uncommenting_message(self, channel) -> bool:
         comment = self.comments_loader.get_comment_by_mode(mode=self.COMMENT_CHOOSING_MODE)
 
-        post_messages = await self.channels_manager.get_last_messages(channel=channel, limit=limit)
+        post_messages = await self.channels_manager.get_last_messages(channel=channel, limit=self.POST_MESSAGES_LIMIT)
 
         if not post_messages:
             logger.warning(f"Empty posts list in channel({channel.title}/{channel.id})")
@@ -46,22 +46,29 @@ class Commentator(BaseWorker):
         return False
 
     async def send_comment_to_post(self, channel, comment, post_message) -> bool:
-        discussion_msg = await self.channels_manager.get_discussion_message(channel=channel, message=post_message)
+        # Getting discussion message object by id
+        discussion_msg_object = await self.channels_manager.get_discussion_message(channel_id=channel.id,
+                                                                                   message_id=post_message["id"])
 
-        if not discussion_msg:
+        if not discussion_msg_object:
             logger.error(f"Could not get discussion messages from message({post_message['id']})")
             return False
 
-        discussion_channel = await self.channels_manager.get_chat_obj(discussion_msg.chats[0].id)
+        # Get comments chat to this message (post)
+        # discussion_msg_object.chats[0] = in chats we have 1-2 objects,
+        # and the first is always the main chat that we are looking for
+        discussion_channel = await self.channels_manager.get_chat_obj(discussion_msg_object.chats[0].id)
 
-        if await self.channels_manager.is_not_commenting_post(discussion_channel, discussion_msg.messages[0].id):
+        # check if we are not commented this post yet
+        if await self.channels_manager.is_not_commented_post(discussion_channel, discussion_msg_object.messages[0].id):
             commenting_result = await self.channels_manager.commenting_post(channel=discussion_channel,
                                                                             comment=comment,
                                                                             comments_loader=self.comments_loader,
-                                                                            post_id=discussion_msg.messages[0].id)
+                                                                            post_id=discussion_msg_object.messages[
+                                                                                0].id)
             if not commenting_result:
                 logger.warning(
-                    f"Could not leave a comment message({discussion_msg.messages[0].id}) in channel({channel.title}/{channel.id})")
+                    f"Could not leave a comment message({discussion_msg_object.messages[0].id}) in channel({channel.title}/{channel.id})")
                 return False
             logger.info(f"Successfully added comment to channel({channel.title}/{channel.id})!")
             return True

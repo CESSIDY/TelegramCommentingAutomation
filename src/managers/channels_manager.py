@@ -1,18 +1,18 @@
 from loaders.channels import BaseChannelsLoader
-from telethon.tl import functions
+from loaders.comments import BaseCommentsLoader
+from telethon.tl import functions, types
 from telethon.tl.types import ChatInviteAlready, ChatInvite
 import logging
-import random
 from telethon.tl.functions.messages import CheckChatInviteRequest
 from telethon.errors import InviteHashExpiredError
 from .media_manager import MediaManager
+from models import MediaModel, FileTypes, CommentLoaderModel
 
 logger = logging.getLogger(__name__)
 
 
 class ChannelsManager:
-    MESSAGES_LIMIT = 100
-    DISCUSSION_MESSAGES_LIMIT = 1000
+    DISCUSSION_MESSAGES_LIMIT = 1000  # Limit for getting messages from discussion chat for some post
 
     def __init__(self, client, channels_loader_adaptor: BaseChannelsLoader):
         self.channels_list = self._get_channels_objects(channels_loader_adaptor)
@@ -68,7 +68,7 @@ class ChannelsManager:
         channel = await self.get_chat_obj(channel_info.id)
         return channel
 
-    async def is_not_commenting_post(self, discussion_channel, msg_id):
+    async def is_not_commented_post(self, discussion_channel, msg_id):
         discussion_messages = await self.get_last_messages_for_discussion(discussion_channel, msg_id)
 
         for message in discussion_messages:
@@ -76,8 +76,14 @@ class ChannelsManager:
                 return False
         return True
 
-    async def get_last_messages_for_discussion(self, discussion_channel, msg_id):
+    async def get_last_messages_for_discussion(self, discussion_channel, msg_id) -> list:
+        """
+        Get comments for particular message (post) by ID
 
+        :param discussion_channel:
+        :param msg_id:
+        :return: list()
+        """
         all_messages = await self.get_last_messages(channel=discussion_channel, limit=self.DISCUSSION_MESSAGES_LIMIT)
         discussion_messages = list()
         for message in all_messages:
@@ -88,7 +94,7 @@ class ChannelsManager:
     async def get_last_messages(self, channel, limit=10) -> list:
         offset_msg = 0
         all_messages = []
-        limit_per_request = self.MESSAGES_LIMIT if limit > self.MESSAGES_LIMIT else limit
+        limit_per_request = limit
 
         while True:
             try:
@@ -104,9 +110,9 @@ class ChannelsManager:
                 logger.error(e)
                 return all_messages
 
-            if not history.messages:
-                break
             messages = history.messages
+            if not messages:
+                break
 
             for message in messages:
                 all_messages.append(message.to_dict())
@@ -118,31 +124,25 @@ class ChannelsManager:
                 break
         return all_messages
 
-    async def get_discussion_message(self, channel, message):
+    async def get_discussion_message(self, channel_id, message_id) -> types.messages.DiscussionMessage or None:
+        """
+        If channel have discussion chat some messages gonna have they room in this chat,
+        so we cat get discussion object for this message(post)
+
+        :param channel_id:
+        :param message_id:
+        :return: types.messages.DiscussionMessage or None
+        """
         try:
             discussion_msg = await self.client(
-                functions.messages.GetDiscussionMessageRequest(peer=channel.id,
-                                                               msg_id=message['id']))
+                functions.messages.GetDiscussionMessageRequest(peer=channel_id,
+                                                               msg_id=message_id))
             return discussion_msg
         except Exception as e:
             logger.warning(e)
         return
 
-    async def get_random_discussion_message(self, channel, messages):
-        messages = messages.copy()
-        random.shuffle(messages)
-
-        for message in messages:
-            try:
-                discussion_msg = await self.client(
-                    functions.messages.GetDiscussionMessageRequest(peer=channel.id,
-                                                                   msg_id=message['id']))
-                return discussion_msg
-            except Exception as e:
-                logger.warning(e)
-        return
-
-    async def commenting_post(self, channel, comment, comments_loader, post_id):
+    async def commenting_post(self, channel, comment: CommentLoaderModel, comments_loader: BaseCommentsLoader, post_id):
         result = None
         if comment.media:
             media = await self.media_manager.get_media_object(comment.media)
@@ -170,11 +170,11 @@ class ChannelsManager:
                 return result
             except Exception as e:
                 logger.warning(e)
-                logger.info("Try send text message")
 
-                comment = comments_loader.get_text_comment()
-                if comment:
-                    text_message = comment.message
+            logger.info("Try send text message")
+            comment = comments_loader.get_text_comment()
+            if comment:
+                text_message = comment.message
 
         try:
             result = await self.client(functions.messages.SendMessageRequest(peer=kwargs.get("peer"),
@@ -185,17 +185,6 @@ class ChannelsManager:
         except Exception as e:
             logger.warning(e)
         return
-
-    async def get_full_chat_obj(self, channel_id):
-        try:
-            channel_obj = await self.client(functions.channels.GetFullChannelRequest(
-                channel=channel_id
-            ))
-        except Exception as e:
-            logger.error(e)
-            return
-
-        return channel_obj
 
     async def get_chat_obj(self, channel_id):
         try:

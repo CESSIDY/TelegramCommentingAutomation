@@ -67,7 +67,7 @@ def run_and_return_client(config, account_model: AccountsLoaderModel):
 
     if is_proxy_enabled:
         proxy = {
-            'proxy_type': config['Proxy']['proxy_type'],  # (mandatory) protocol to use (see above)
+            'proxy_type': config['Proxy']['proxy_type'],  # (mandatory) protocol to use
             'addr': config['Proxy']['addr'],  # (mandatory) proxy IP address
             'port': config['Proxy']['port'],  # (mandatory) proxy port number
             'username': config['Proxy']['username'],  # (optional) username if the proxy requires auth
