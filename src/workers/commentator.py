@@ -50,13 +50,14 @@ class Commentator(BaseWorker):
         # Getting discussion message object by id
         discussion_msg_object = await self.channels_manager.get_discussion_message(channel_id=channel.id,
                                                                                    message_id=post_id)
-        # because can be more than 1 chat or message but first [0] its always main one
-        discussion_channel_id = discussion_msg_object.chats[0].id
-        discussion_msg_id = discussion_msg_object.messages[0].id
 
         if not discussion_msg_object:
             logger.warning(f"Could not get discussion messages from message({post_id})")
             return False
+
+        # because can be more than 1 chat or message but first [0] its always main one
+        discussion_channel_id = discussion_msg_object.chats[0].id
+        discussion_msg_id = discussion_msg_object.messages[0].id
 
         discussion_channel = await self.channels_manager.get_chat_obj(discussion_channel_id)
 
