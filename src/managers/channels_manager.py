@@ -1,6 +1,7 @@
 from loaders.channels import BaseChannelsLoader
 from loaders.comments import BaseCommentsLoader
 from telethon.tl import functions, types
+from telethon import tl
 from telethon.tl.types import ChatInviteAlready, ChatInvite
 import logging
 from telethon.tl.functions.messages import CheckChatInviteRequest
@@ -72,7 +73,7 @@ class ChannelsManager:
         discussion_messages = await self.get_last_messages_for_discussion(discussion_channel, msg_id)
 
         for message in discussion_messages:
-            if self.user_owner.id == message['from_id'].get('user_id', None):
+            if self.user_owner.id == message.get('from_id', {}).get('user_id', None):
                 return False
         return True
 
@@ -80,9 +81,7 @@ class ChannelsManager:
         """
         Get comments for particular message (post) by ID
 
-        :param discussion_channel:
-        :param msg_id:
-        :return: list()
+        :returns tl.types.messages.Messages: Instance of either Messages, MessagesSlice, ChannelMessages, MessagesNotModified.
         """
         all_messages = await self.get_last_messages(channel=discussion_channel, limit=self.DISCUSSION_MESSAGES_LIMIT)
         discussion_messages = list()
@@ -92,6 +91,9 @@ class ChannelsManager:
         return discussion_messages
 
     async def get_last_messages(self, channel, limit=10) -> list:
+        """
+        :returns tl.types.messages.Messages: Instance of either Messages, MessagesSlice, ChannelMessages, MessagesNotModified.
+        """
         offset_msg = 0
         all_messages = []
         limit_per_request = limit
@@ -122,16 +124,13 @@ class ChannelsManager:
 
             if limit and total_messages >= limit:
                 break
+
         return all_messages
 
-    async def get_discussion_message(self, channel_id, message_id) -> types.messages.DiscussionMessage or None:
+    async def get_discussion_message(self, channel_id, message_id) -> tl.types.messages.DiscussionMessage or None:
         """
         If channel have discussion chat some messages gonna have they room in this chat,
         so we cat get discussion object for this message(post)
-
-        :param channel_id:
-        :param message_id:
-        :return: types.messages.DiscussionMessage or None
         """
         try:
             discussion_msg = await self.client(
@@ -143,55 +142,63 @@ class ChannelsManager:
         return
 
     async def commenting_post(self, channel, comment: CommentLoaderModel, comments_loader: BaseCommentsLoader, post_id):
-        result = None
+        media = None
+
         if comment.media:
             media = await self.media_manager.get_media_object(comment.media)
 
-            if media:
-                result = await self._try_send_message_with_retry(peer=channel,
-                                                                 media=media,
-                                                                 message=comment.message,
-                                                                 reply_to_msg_id=post_id,
-                                                                 comments_loader=comments_loader)
-        else:
-            result = await self._try_send_message_with_retry(peer=channel,
-                                                             message=comment.message,
-                                                             reply_to_msg_id=post_id,
-                                                             comments_loader=comments_loader)
+        result = await self._try_send_comment_with_retry(comments_loader=comments_loader,
+                                                         peer=channel,
+                                                         media=media,
+                                                         message=comment.message,
+                                                         reply_to_msg_id=post_id)
         return result
 
-    async def _try_send_message_with_retry(self, **kwargs):
-        text_message = kwargs.get("message")
-        comments_loader = kwargs.pop("comments_loader", [])
-
-        if kwargs.get("media"):
-            try:
-                result = await self.client(functions.messages.SendMediaRequest(**kwargs))
+    async def _try_send_comment_with_retry(self, comments_loader, peer, message, reply_to_msg_id, media=None):
+        if media:
+            result = await self._send_media_comment(media=media,
+                                                    peer=peer,
+                                                    message=message,
+                                                    reply_to_msg_id=reply_to_msg_id)
+            if result:
                 return result
-            except Exception as e:
-                logger.warning(e)
 
-            logger.info("Try send text message")
+            logger.info("Try re-send text message")
             comment = comments_loader.get_text_comment()
             if comment:
-                text_message = comment.message
+                message = comment.message
 
+        return await self._send_text_comment(peer=peer,
+                                             message=message,
+                                             reply_to_msg_id=reply_to_msg_id)
+
+    async def _send_media_comment(self, media, peer, message, reply_to_msg_id):
         try:
-            result = await self.client(functions.messages.SendMessageRequest(peer=kwargs.get("peer"),
-                                                                             message=text_message,
-                                                                             reply_to_msg_id=kwargs.get(
-                                                                                 "reply_to_msg_id")))
+            result = await self.client(functions.messages.SendMediaRequest(peer=peer,
+                                                                           media=media,
+                                                                           message=message,
+                                                                           reply_to_msg_id=reply_to_msg_id))
             return result
         except Exception as e:
             logger.warning(e)
         return
 
-    async def get_chat_obj(self, channel_id):
+    async def _send_text_comment(self, peer, message, reply_to_msg_id):
+        try:
+            result = await self.client(functions.messages.SendMessageRequest(peer=peer,
+                                                                             message=message,
+                                                                             reply_to_msg_id=reply_to_msg_id))
+            return result
+        except Exception as e:
+            logger.warning(e)
+        return
+
+    async def get_chat_obj(self, channel_id) -> tl.types.channels.ChannelParticipant or None:
         try:
             channel_obj = await self.client(functions.channels.GetChannelsRequest(
                 id=[channel_id]
             ))
         except Exception as e:
             logger.info(e)
-            return None
+            return
         return channel_obj.chats[0]
