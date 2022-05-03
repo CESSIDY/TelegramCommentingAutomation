@@ -40,36 +40,35 @@ class Commentator(BaseWorker):
             return False
 
         for post in posts:
-            result = await self.send_comment_to_post(channel=channel, comment=comment, post=post)
+            result = await self.send_comment_to_post(channel=channel, comment=comment, post_id=post["id"])
             if result:
                 return True
         logger.warning(f"Could not leave comment under any message in channel({channel.title}/{channel.id})!")
         return False
 
-    async def send_comment_to_post(self, channel, comment: CommentLoaderModel, post) -> bool:
+    async def send_comment_to_post(self, channel, comment: CommentLoaderModel, post_id) -> bool:
         # Getting discussion message object by id
         discussion_msg_object = await self.channels_manager.get_discussion_message(channel_id=channel.id,
-                                                                                   message_id=post["id"])
+                                                                                   message_id=post_id)
+        # because can be more than 1 chat or message but first [0] its always main one
+        discussion_channel_id = discussion_msg_object.chats[0].id
+        discussion_msg_id = discussion_msg_object.messages[0].id
 
         if not discussion_msg_object:
-            logger.warning(f"Could not get discussion messages from message({post['id']})")
+            logger.warning(f"Could not get discussion messages from message({post_id})")
             return False
 
-        # Get comments chat to this message (post)
-        # discussion_msg_object.chats[0] = in chats we have 1-2 objects,
-        # and the first is always the main chat that we are looking for
-        discussion_channel = await self.channels_manager.get_chat_obj(discussion_msg_object.chats[0].id)
+        discussion_channel = await self.channels_manager.get_chat_obj(discussion_channel_id)
 
         # check if we are not commented this post yet
-        if await self.channels_manager.is_not_commented_post(discussion_channel, discussion_msg_object.messages[0].id):
+        if await self.channels_manager.is_not_commented_post(discussion_channel, discussion_msg_id):
             commenting_result = await self.channels_manager.commenting_post(channel=discussion_channel,
                                                                             comment=comment,
                                                                             comments_loader=self.comments_loader,
-                                                                            post_id=discussion_msg_object.messages[
-                                                                                0].id)
+                                                                            post_id=discussion_msg_id)
             if not commenting_result:
                 logger.warning(
-                    f"Could not leave a comment message({discussion_msg_object.messages[0].id}) in channel({channel.title}/{channel.id})")
+                    f"Could not leave a comment message({discussion_msg_id}) in channel({channel.title}/{channel.id})")
                 return False
             logger.info(f"Successfully added comment to channel({channel.title}/{channel.id})!")
             return True
