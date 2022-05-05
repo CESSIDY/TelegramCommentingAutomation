@@ -1,6 +1,4 @@
 from dataclasses import dataclass
-from enum import Enum
-from os.path import exists
 import logging
 from .media_model import MediaModel
 

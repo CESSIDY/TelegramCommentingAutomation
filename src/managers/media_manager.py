@@ -1,5 +1,5 @@
 from models import MediaModel, FileTypes
-from telethon.tl import functions, types
+from telethon.tl import types
 from telethon.tl.types import DocumentAttributeFilename
 
 
@@ -41,4 +41,3 @@ class MediaManager:
                 attributes=[DocumentAttributeFilename(file_name)]
             )
         return media
-
