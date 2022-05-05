@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class Commentator(BaseWorker):
-    POSTS_LIMIT = 10  # Limit the number of messages (posts) from channel we will review
     COMMENT_CHOOSING_MODE = CommentsChoosingMode.RANDOM  # Mode for selecting one comment from all
 
     def __init__(self, client, comments_loader_adaptor: BaseCommentsLoader,
@@ -36,17 +35,14 @@ class Commentator(BaseWorker):
 
     async def commenting_channel(self, channel) -> bool:
         comment = self.comments_loader.get_comment_by_mode(mode=self.COMMENT_CHOOSING_MODE)
-        posts = await self.messages_manager.get_last_messages(channel=channel, limit=self.POSTS_LIMIT)
 
-        if not posts:
-            logger.warning(f"Empty posts list in channel({channel.title}/{channel.id})")
-            return False
-
-        result = await self.commenting_last_uncommenting_post(channel=channel, posts=posts, comment=comment)
+        result = await self.commenting_last_uncommenting_post(channel=channel, comment=comment)
 
         return result
 
-    async def commenting_last_uncommenting_post(self, channel, posts, comment) -> bool:
+    async def commenting_last_uncommenting_post(self, channel, comment) -> bool:
+        posts = await self.get_last_posts(channel=channel, limit=10)
+
         for post in posts:
             # Getting discussion message object by id
             discussion_msg_object = await self.messages_manager.get_discussion_message(channel_id=channel.id,
@@ -54,7 +50,7 @@ class Commentator(BaseWorker):
 
             if not discussion_msg_object:
                 logger.warning(f"Could not get discussion messages from message({post['id']})")
-                return False
+                continue
 
             # because can be more than 1 chat or message but first [0] its always main one
             discussion_channel_id = discussion_msg_object.chats[0].id
@@ -73,6 +69,15 @@ class Commentator(BaseWorker):
 
         logger.warning(f"Could not leave comment under any post in channel({channel.title}/{channel.id})!")
         return False
+
+    async def get_last_posts(self, channel, limit) -> list:
+        posts = await self.messages_manager.get_last_messages(channel=channel, limit=limit)
+
+        if not posts:
+            logger.warning(f"Empty posts list in channel({channel.title}/{channel.id})")
+            return []
+
+        return posts
 
     async def send_comment_to_post(self, channel, comment: CommentLoaderModel, post_id):
         media = None
