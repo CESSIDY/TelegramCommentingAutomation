@@ -6,20 +6,19 @@ from loaders.channels import JsonChannelsLoader
 from loaders.comments import JsonCommentsLoader
 from models import AccountsLoaderModel
 from utils import session_files_path, get_proxy_configurations, configure_logging
-from workers.commentator import Commentator
+from workers import Commentator
+from workers.commentators import CommentingLastUncommentingPostAdaptor
 
 configure_logging()
 logger = logging.getLogger(__name__)
 
 
 def main():
-    comments_loader = JsonCommentsLoader()
-    channels_loader = JsonChannelsLoader()
     accounts_loader = JsonAccountsLoader()
     account_models = accounts_loader.get_all()
 
     account_models = check_and_init_sessions(account_models)
-    run_commentator_for_all_accounts(account_models, comments_loader, channels_loader)
+    run_commentator_for_all_accounts(account_models)
 
 
 def check_and_init_sessions(account_models) -> [AccountsLoaderModel]:
@@ -38,12 +37,18 @@ def check_and_init_sessions(account_models) -> [AccountsLoaderModel]:
     return temp_account_models
 
 
-def run_commentator_for_all_accounts(account_models, comments_loader, channels_loader):
+def run_commentator_for_all_accounts(account_models):
+    comments_loader = JsonCommentsLoader()
+    channels_loader = JsonChannelsLoader()
+
     for account in account_models:
         print(f"Start processing for {account.username}")
         client = run_and_return_client(account)
-        commentator = Commentator(client, comments_loader, channels_loader)
+
+        commenting_adapter = CommentingLastUncommentingPostAdaptor(client, comments_loader)
+        commentator = Commentator(client, comments_loader, channels_loader, commenting_adapter)
         commentator.run_until_complete()
+
         client.disconnect()
         print(f"Finish processing for {account.username}")
 
