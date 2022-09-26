@@ -17,27 +17,27 @@ def main():
     accounts_loader = JsonAccountsLoader()
     account_models = accounts_loader.get_all()
 
-    account_models = check_and_init_sessions(account_models)
-    run_commentator_for_all_accounts(account_models)
+    account_models = init_sessions(account_models)
+    run_commentator_for_each_account(account_models)
 
 
-def check_and_init_sessions(account_models) -> [AccountsLoaderModel]:
-    temp_account_models = list()
+def init_sessions(account_models: [AccountsLoaderModel]) -> [AccountsLoaderModel]:
+    correct_account_models = list()
 
     for account in account_models:
         print(f"Login for: {account.username}")
         try:
             client = run_and_return_client(account)
             client.disconnect()
-            temp_account_models.append(account)
-        except Exception as e:
+            correct_account_models.append(account)
+        except Exception as err:
             print(f"Authorization error for {account.username}")
-            logger.error(e)
+            logger.error(err)
 
-    return temp_account_models
+    return correct_account_models
 
 
-def run_commentator_for_all_accounts(account_models):
+def run_commentator_for_each_account(account_models):
     comments_loader = JsonCommentsLoader()
     channels_loader = JsonChannelsLoader()
 

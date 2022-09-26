@@ -20,15 +20,6 @@ class BaseCommentatorAdaptor(ABC):
     async def commenting(self, channel, comment) -> bool:
         pass
 
-    async def get_last_posts(self, channel, limit) -> list:
-        posts = await self.messages_manager.get_last_messages(channel=channel, limit=limit)
-
-        if not posts:
-            logger.warning(f"Empty posts list in channel({channel.title}/{channel.id})")
-            return []
-
-        return posts
-
     async def send_comment_to_post(self, channel, comment: CommentLoaderModel, post_id):
         media = None
 

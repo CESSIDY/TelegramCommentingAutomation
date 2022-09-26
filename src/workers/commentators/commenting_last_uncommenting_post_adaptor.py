@@ -5,10 +5,10 @@ logger = logging.getLogger(__name__)
 
 
 class CommentingLastUncommentingPostAdaptor(BaseCommentatorAdaptor):
-    POST_LIMIT = 10  # Limit the number of messages (posts) from channel we will review
+    POSTS_LIMIT = 10  # Limit the number of messages (posts) from channel we will review
 
     async def commenting(self, channel, comment) -> bool:
-        posts = await self.get_last_posts(channel=channel, limit=self.POST_LIMIT)
+        posts = await self.messages_manager.get_last_messages(channel=channel, limit=self.POSTS_LIMIT)
 
         for post in posts:
             # Getting discussion message object by id
@@ -24,7 +24,7 @@ class CommentingLastUncommentingPostAdaptor(BaseCommentatorAdaptor):
             discussion_channel = discussion_msg_object.chats[0]
 
             # check if we are not commented this post yet
-            if await self.messages_manager.is_not_commented_post(discussion_channel, discussion_msg_id):
+            if not await self.messages_manager.is_commented_post(discussion_channel, discussion_msg_id):
                 commenting_result = await self.send_comment_to_post(channel=discussion_channel,
                                                                     comment=comment,
                                                                     post_id=discussion_msg_id)

@@ -12,13 +12,17 @@ class MessagesManager:
         self.client = client
         self.user_owner = self.client.get_me()
 
-    async def is_not_commented_post(self, discussion_channel, msg_id):
+    async def is_commented_post(self, discussion_channel, msg_id):
         discussion_messages = await self.get_last_messages_for_discussion(discussion_channel, msg_id)
 
         for message in discussion_messages:
-            if self.user_owner.id == message.get('from_id', {}).get('user_id', None):
-                return False
-        return True
+            if self.is_user_message(message, self.user_owner):
+                return True
+        return False
+
+    @staticmethod
+    def is_user_message(message, user):
+        return user.id == message.get('from_id', {}).get('user_id', None)
 
     async def get_last_messages_for_discussion(self, discussion_channel, msg_id) -> list:
         """
@@ -29,12 +33,19 @@ class MessagesManager:
         all_messages = await self.get_last_messages(channel=discussion_channel, limit=self.DISCUSSION_MESSAGES_LIMIT)
         discussion_messages = list()
         for message in all_messages:
-            if message['reply_to'] and message.get('reply_to', {}).get('reply_to_msg_id', None) == msg_id:
+            # get comment that are related to particular post by msg_id
+            if self.is_message_reply_to_id(message, msg_id):
                 discussion_messages.append(message)
         return discussion_messages
 
+    @staticmethod
+    def is_message_reply_to_id(message, msg_id):
+        return message['reply_to'] and message.get('reply_to', {}).get('reply_to_msg_id', None) == msg_id
+
     async def get_last_messages(self, channel, limit=10) -> list:
         """
+        Get fist (limit) number of messages from channel.
+
         :returns tl.types.messages.Messages: Instance of either Messages, MessagesSlice, ChannelMessages, MessagesNotModified.
         """
         offset_msg = 0

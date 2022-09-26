@@ -1,10 +1,11 @@
-from loaders.channels import BaseChannelsLoader
 from telethon.tl import functions, types
 from telethon import tl
 from telethon.tl.types import ChatInviteAlready, ChatInvite
 import logging
 from telethon.tl.functions.messages import CheckChatInviteRequest
 from telethon.errors import InviteHashExpiredError
+from loaders.channels import BaseChannelsLoader
+
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,9 @@ class ChannelsManager:
     def __init__(self, client, channels_loader_adaptor: BaseChannelsLoader):
         self.channels_list = self._get_channels_objects(channels_loader_adaptor)
         self.client = client
+
+    async def get_channels(self):
+        return self.channels_list
 
     async def _get_channels_objects(self, channels_loader: BaseChannelsLoader) -> list:
         channels_list = list()
@@ -27,9 +31,6 @@ class ChannelsManager:
                 channels_list.append(channel)
 
         return channels_list
-
-    async def get_channels(self):
-        return self.channels_list
 
     async def get_private_channel(self, channel_info):
         channel = None
@@ -48,7 +49,7 @@ class ChannelsManager:
                 if channel:
                     channel = await self.get_chat_obj(channel.id)
                 return channel
-        except InviteHashExpiredError as err:
+        except InviteHashExpiredError:
             pass
 
         # If invite hash expired than we can try just join to channels by request
